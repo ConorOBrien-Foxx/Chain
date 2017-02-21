@@ -54,6 +54,43 @@ def input
     STDIN.gets.chomp
 end
 
+class ANY
+    def ANY.===(other)
+        true
+    end
+end
+
+class Typed
+    def initialize(hash)
+        @hash = hash
+        @arity = hash.to_a.first.size
+    end
+    
+    attr_accessor :hash, :arity
+    
+    def match(args)
+        @hash.map { |type_arr, val|
+            # p [type_arr, val, args]
+            type_arr.zip(args).all? { |arr|
+                type, arg = arr
+                # p [type, arg, arr]
+                type === arr
+            } ? val : nil
+        }.reject { |e| e == nil } .first
+    end
+    
+    def [](*args)
+        proc = match(args)
+        p proc
+        proc[*args]
+    end
+end
+# e.g
+#
+#   Typed.new({
+#       [String, String] => -> a, b { a + b }
+#   })
+
 class Chain
     @@commands = [
         ChainCommand.new("\xA2", -> a { a.to_i }),
@@ -65,7 +102,10 @@ class Chain
         ChainCommand.new("\xAC", -> a { 1 - a }),
         ChainCommand.new("\xB0", -> a, b { a * b.ord }),
         ChainCommand.new("\xB1", -> a, b { a + b }),
-        ChainCommand.new("\xB6", -> a { a + "\n" }),
+        ChainCommand.new("\xB6", Typed.new({
+            [String]  => -> a { a + "\n" },
+            [Numeric] => -> a { a },
+        })),
         ChainCommand.new("\xBA", -> { }),
         ChainCommand.new("\xCC", -> { input }),
         ChainCommand.new("\xCD", -> { input.to_i }),
@@ -237,4 +277,8 @@ if __FILE__ == $0
     file_name = ARGV[0]
     prog = read_cp_file file_name
     Chain.execute prog
+    unless $stdin.tty?
+        rest_of_stdin = $stdin.read
+        print rest_of_stdin if rest_of_stdin.size > 0
+    end
 end
