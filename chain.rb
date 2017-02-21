@@ -1,11 +1,26 @@
 # chain
 
+require 'optparse'
+
 $encoding = "iso-8859-1"
 
-def read_cp_file(file_name)
+def read_file(file_name, my_encoding = $encoding)
     prog = File.read(
-        file_name, :encoding => $encoding
-    ).chars.map { |e| e.force_encoding "UTF-8" }
+        file_name, :encoding => my_encoding
+    ).chars
+    if my_encoding.upcase == "UTF-8"
+        # map chars to thingies
+        iso_like_chars = "\xA0¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
+        prog.map! { |chr|
+            if iso_like_chars.include? chr
+                (160 + iso_like_chars.index(chr)).chr
+            else
+                chr
+            end
+        }
+    end
+    prog.map! { |e| e.force_encoding "UTF-8" }
+    prog
 end
 
 class String
@@ -81,7 +96,7 @@ class Typed
     
     def [](*args)
         proc = match(args)
-        p proc
+        # p proc
         proc[*args]
     end
 end
@@ -274,8 +289,32 @@ end
 
 # activate interpreter
 if __FILE__ == $0
+    options = {
+        :utf8 => false
+    }
+    OptionParser.new { |opts|
+        opts.banner = "Usage: chain.rb [options]"
+        opts.separator ""
+        opts.separator "[options]"
+        opts.on("-u", "--utf8", "Read a unicode file instead of an ISO-8859-1 file.") { |v|
+            options[:utf8] = v
+        }
+        opts.on_tail("-h", "--help", "-?", "Show the help message") {
+            puts opts
+        }
+    }.parse!
+    
+    # p options
+    # p ARGV
+    
+    # exit
+    
     file_name = ARGV[0]
-    prog = read_cp_file file_name
+    if options[:utf8]
+        prog = read_file file_name, "UTF-8"
+    else
+        prog = read_file file_name
+    end
     Chain.execute prog
     unless $stdin.tty?
         rest_of_stdin = $stdin.read
